@@ -248,10 +248,6 @@ func TestChannelWithDeadlinesImplementation(t *testing.T) {
 		t.Fatalf("unexpected error opening a session channel: %v", err)
 	}
 
-	if _, ok := ch.(ChannelWithDeadlines); !ok {
-		t.Errorf("the returned channel does not support deadlines")
-	}
-
 	session, err := newSession(ch, in)
 	if err != nil {
 		t.Fatalf("Unable to request new session: %v", err)

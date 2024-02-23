@@ -77,11 +77,6 @@ type Channel interface {
 	// safely be read and written from a different goroutine than
 	// Read and Write respectively.
 	Stderr() io.ReadWriter
-}
-
-// ChannelWithDeadlines is a channel with deadlines support.
-type ChannelWithDeadlines interface {
-	Channel
 
 	// SetDeadline sets the read and write deadlines associated with the
 	// channel. It is equivalent to calling both SetReadDeadline and
