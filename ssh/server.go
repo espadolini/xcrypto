@@ -126,6 +126,8 @@ type ServerConfig struct {
 	// Permissions.Extensions entry.
 	PublicKeyCallback func(conn ConnMetadata, key PublicKey) (*Permissions, error)
 
+	VerifiedPublicKeyCallback func(conn ConnMetadata, key PublicKey, permissions *Permissions) (*Permissions, error)
+
 	// KeyboardInteractiveCallback, if non-nil, is called when
 	// keyboard-interactive authentication is selected (RFC
 	// 4256). The client object's Challenge function should be
@@ -468,6 +470,9 @@ type ServerAuthCallbacks struct {
 	// PublicKeyCallback behaves like [ServerConfig.PublicKeyCallback].
 	PublicKeyCallback func(conn ConnMetadata, key PublicKey) (*Permissions, error)
 
+	// PublicKeyCallback behaves like [ServerConfig.VerifiedPublicKeyCallback].
+	VerifiedPublicKeyCallback func(conn ConnMetadata, key PublicKey, permissions *Permissions) (*Permissions, error)
+
 	// KeyboardInteractiveCallback behaves like [ServerConfig.KeyboardInteractiveCallback].
 	KeyboardInteractiveCallback func(conn ConnMetadata, client KeyboardInteractiveChallenge) (*Permissions, error)
 
@@ -533,6 +538,7 @@ func (s *connection) serverAuthenticate(config *ServerConfig) (*Permissions, err
 	authConfig := ServerAuthCallbacks{
 		PasswordCallback:            config.PasswordCallback,
 		PublicKeyCallback:           config.PublicKeyCallback,
+		VerifiedPublicKeyCallback:   config.VerifiedPublicKeyCallback,
 		KeyboardInteractiveCallback: config.KeyboardInteractiveCallback,
 		GSSAPIWithMICConfig:         config.GSSAPIWithMICConfig,
 	}
@@ -724,6 +730,10 @@ userAuthLoop:
 
 				if err := pubKey.Verify(signedData, sig); err != nil {
 					return nil, err
+				}
+
+				if candidate.result == nil && authConfig.VerifiedPublicKeyCallback != nil {
+					candidate.perms, candidate.result = authConfig.VerifiedPublicKeyCallback(s, pubKey, candidate.perms)
 				}
 
 				authErr = candidate.result
