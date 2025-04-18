@@ -811,7 +811,13 @@ userAuthLoop:
 
 		var failureMsg userAuthFailureMsg
 
-		if partialSuccess, ok := authErr.(*PartialSuccessError); ok {
+		if customDiscMsg, ok := authErr.(*disconnectMsg); ok {
+			if err := s.transport.writePacket(Marshal(customDiscMsg)); err != nil {
+				return nil, err
+			}
+			authErrs = append(authErrs, customDiscMsg)
+			return nil, &ServerAuthError{Errors: authErrs}
+		} else if partialSuccess, ok := authErr.(*PartialSuccessError); ok {
 			// After a partial success error we don't allow changing the user
 			// name and execute the NoClientAuthCallback.
 			partialSuccessReturned = true
