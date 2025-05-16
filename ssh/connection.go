@@ -97,6 +97,20 @@ func (c *connection) Close() error {
 	return c.sshConn.conn.Close()
 }
 
+type RawConnection connection
+
+func (r *RawConnection) IncomingPackets() <-chan []byte {
+	return (*connection)(r).transport.incoming
+}
+
+func (r *RawConnection) WritePacket(p []byte) error {
+	return (*connection)(r).transport.writePacket(p)
+}
+
+func (r *RawConnection) Close() error {
+	return (*connection)(r).Close()
+}
+
 // sshConn provides net.Conn metadata, but disallows direct reads and
 // writes.
 type sshConn struct {

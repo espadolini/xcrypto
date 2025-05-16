@@ -228,15 +228,7 @@ type ServerConn struct {
 	Permissions *Permissions
 }
 
-// NewServerConn starts a new SSH server with c as the underlying
-// transport.  It starts with a handshake and, if the handshake is
-// unsuccessful, it closes the connection and returns an error.  The
-// Request and NewChannel channels must be serviced, or the connection
-// will hang.
-//
-// The returned error may be of type *ServerAuthError for
-// authentication errors.
-func NewServerConn(c net.Conn, config *ServerConfig) (*ServerConn, <-chan NewChannel, <-chan *Request, error) {
+func newServerConnection(c net.Conn, config *ServerConfig) (*connection, *Permissions, error) {
 	fullConf := *config
 	fullConf.SetDefaults()
 	if fullConf.MaxAuthTries == 0 {
@@ -248,7 +240,7 @@ func NewServerConn(c net.Conn, config *ServerConfig) (*ServerConn, <-chan NewCha
 		for _, algo := range fullConf.PublicKeyAuthAlgorithms {
 			if !contains(supportedPubKeyAuthAlgos, algo) {
 				c.Close()
-				return nil, nil, nil, fmt.Errorf("ssh: unsupported public key authentication algorithm %s", algo)
+				return nil, nil, fmt.Errorf("ssh: unsupported public key authentication algorithm %s", algo)
 			}
 		}
 	}
@@ -266,9 +258,34 @@ func NewServerConn(c net.Conn, config *ServerConfig) (*ServerConn, <-chan NewCha
 	perms, err := s.serverHandshake(&fullConf)
 	if err != nil {
 		c.Close()
+		return nil, nil, err
+	}
+	return s, perms, nil
+}
+
+// NewServerConn starts a new SSH server with c as the underlying
+// transport.  It starts with a handshake and, if the handshake is
+// unsuccessful, it closes the connection and returns an error.  The
+// Request and NewChannel channels must be serviced, or the connection
+// will hang.
+//
+// The returned error may be of type *ServerAuthError for
+// authentication errors.
+func NewServerConn(c net.Conn, config *ServerConfig) (*ServerConn, <-chan NewChannel, <-chan *Request, error) {
+	s, perms, err := newServerConnection(c, config)
+	if err != nil {
 		return nil, nil, nil, err
 	}
+	s.mux = newMux(s.transport)
 	return &ServerConn{s, perms}, s.mux.incomingChannels, s.mux.incomingRequests, nil
+}
+
+func NewRawServerConn(c net.Conn, config *ServerConfig) (*RawConnection, *Permissions, error) {
+	s, perms, err := newServerConnection(c, config)
+	if err != nil {
+		return nil, nil, err
+	}
+	return (*RawConnection)(s), perms, nil
 }
 
 // signAndMarshal signs the data with the appropriate algorithm,
@@ -339,7 +356,6 @@ func (s *connection) serverHandshake(config *ServerConfig) (*Permissions, error)
 	if err != nil {
 		return nil, err
 	}
-	s.mux = newMux(s.transport)
 	return perms, err
 }
 
